@@ -1,0 +1,26 @@
+[
+  {
+    "vote1": "lambada",
+    "vote2": "zoubida",
+    "vote3": "foumoila",
+    "vote4": "mystery"
+  },
+  {
+    "vote1": "zoubida",
+    "vote2": "lambada",
+    "vote3": "foumoila",
+    "vote4": "mystery"
+  },
+  {
+    "vote1": "lambada",
+    "vote2": "foumoila",
+    "vote3": "zoubida",
+    "vote4": "mystery"
+  },
+  {
+    "vote1": "zoubida",
+    "vote2": "mystery",
+    "vote3": "lambada",
+    "vote4": "foumoila"
+  }
+]
