@@ -29,7 +29,7 @@ def prettyVoteResult(voteResult: VoteResult): String = {
   val voteFilename = "vote.json"
   val param = readFromString[Parameter](readFromFile(parameterFilename))
   val votes: Array[Vote] = readFromString[Array[Vote]](readFromFile(voteFilename))
-  val voteResults = votes.foldLeft(Map(param.activity1 -> VoteResult(), param.activity2 -> VoteResult(), param.activity3 -> VoteResult(), param.mystery -> VoteResult())) {
+  val voteResults = votes.foldLeft(Map(param.activity1 -> VoteResult(), param.activity2 -> VoteResult(), param.activity3 -> VoteResult(), param.activity4 -> VoteResult())) {
     (counters, vote) =>
       val voteResult1 = counters(vote.vote1)
       val voteResult2 = counters(vote.vote2)
@@ -66,7 +66,7 @@ def prettyVoteResult(voteResult: VoteResult): String = {
   println(s"1. ${param.activity1}")
   println(s"2. ${param.activity2}")
   println(s"3. ${param.activity3}")
-  println(s"4. ${param.mystery}")
+  println(s"4. ${param.activity4}")
   println("|                                                                          |")
   println("----------------------------------------------------------------------------")
   println("|                                 RESULTS                                  |")
