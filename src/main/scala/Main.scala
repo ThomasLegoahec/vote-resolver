@@ -15,8 +15,9 @@ def readFromFile(filename: String): String = {
   json
 }
 
-def prettyVoteResult(voteResult: VoteResult): String = {
-  s"Nb of votes : ${voteResult.counterVote}\n" +
+def prettyVoteResult(voteResult: VoteResult, activity: String, bonusActivity : String): String = {
+    s"Activity : $activity \n"+
+    s"Nb of votes : ${voteResult.counterVote} ${if(activity == bonusActivity){"(+1 from bonus)"} else ""} \n" +
     s"Nb of votes 1 : ${voteResult.nbVote1}\n" +
     s"Nb of votes 2 : ${voteResult.nbVote2}\n" +
     s"Nb of votes 3 : ${voteResult.nbVote3}\n" +
@@ -40,7 +41,10 @@ def prettyVoteResult(voteResult: VoteResult): String = {
         vote.vote3 -> voteResult3.copy(counterVote = voteResult3.counterVote + 2, nbVote3 = voteResult3.nbVote3 + 1),
         vote.vote4 -> voteResult4.copy(counterVote = voteResult4.counterVote + 1, nbVote4 = voteResult4.nbVote4 + 1))
   }
-  val maxResult = voteResults.reduce { (left, right) =>
+  val activityWithBonus = voteResults(param.activityWithBonus)
+  val activityWithBonusWeighted = activityWithBonus.copy(counterVote = activityWithBonus.counterVote+1)
+  val voteResultsWeighted = voteResults + (param.activityWithBonus -> activityWithBonusWeighted)
+  val maxResult = voteResultsWeighted.reduce { (left, right) =>
     val leftVote = left._2
     val rightVote = right._2
     (leftVote, rightVote) match {
@@ -54,6 +58,8 @@ def prettyVoteResult(voteResult: VoteResult): String = {
       case (leftVote, rightVote) if leftVote.counterVote == rightVote.counterVote && leftVote.nbVote3 < rightVote.nbVote3 => right
       case (leftVote, rightVote) if leftVote.counterVote == rightVote.counterVote && leftVote.nbVote4 > rightVote.nbVote4 => left
       case (leftVote, rightVote) if leftVote.counterVote == rightVote.counterVote && leftVote.nbVote4 < rightVote.nbVote4 => right
+      case (leftVote, rightVote) if left._1 == param.activityWithBonus => left
+      case (leftVote, rightVote) if right._1 == param.activityWithBonus => right
       case _ => left
     }
   }
@@ -68,10 +74,12 @@ def prettyVoteResult(voteResult: VoteResult): String = {
   println(s"3. ${param.activity3}")
   println(s"4. ${param.activity4}")
   println("|                                                                          |")
+  println(s"Bonus active on : ${param.activityWithBonus}")
+  println("|                                                                          |")
   println("----------------------------------------------------------------------------")
   println("|                                 RESULTS                                  |")
   println("----------------------------------------------------------------------------")
-  voteResults.foreach((activity, voteResult) => println(s"Activity : $activity \n${prettyVoteResult(voteResult)}"))
+  voteResultsWeighted.foreach((activity, voteResult) => println(prettyVoteResult(voteResult, activity, param.activityWithBonus)))
   println("----------------------------------------------------------------------------")
   println("|                            AND THE WINNER IS                             |")
   println("----------------------------------------------------------------------------")
