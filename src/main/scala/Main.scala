@@ -5,32 +5,39 @@ import domain.{Parameter, Vote, VoteResult}
 import scala.io.Source
 
 given parameterCodec: JsonValueCodec[Parameter] = JsonCodecMaker.make
-given voteCodec: JsonValueCodec[Vote] = JsonCodecMaker.make
-given voteArrayCodec: JsonValueCodec[Array[Vote]] = JsonCodecMaker.make
 
-def readFromFile(filename: String): String = {
+def readFromFile(filename: String): Seq[String] = {
   val file = Source.fromFile(filename)
-  val json = file.getLines().mkString
+  val json = file.getLines().toSeq
   file.close()
   json
 }
 
-def prettyVoteResult(voteResult: VoteResult, activity: String, bonusActivity : String): String = {
-    s"Activity : $activity \n"+
-    s"Nb of votes : ${voteResult.counterVote} ${if(activity == bonusActivity){"(+1 from bonus)"} else ""} \n" +
+def parseVotes(rawVotes: Seq[String]): Seq[Vote] = {
+
+  val pattern = """\s*([1-4])\/([1-4])\/([1-4])\/([1-4])\s*(\w+)""".r
+
+  rawVotes.map(vote => {
+    val pattern(vote1, vote2, vote3, vote4, name) = vote
+    Vote(vote1, vote2, vote3, vote4, name)
+  })
+}
+
+def prettyVoteResult(voteResult: VoteResult, activity: String, bonusActivity: String): String = {
+  s"Activity : $activity \n" +
+    s"Nb of votes : ${voteResult.counterVote} ${
+      if (activity == bonusActivity) {
+        "(+1 from bonus)"
+      } else ""
+    } \n" +
     s"Nb of votes 1 : ${voteResult.nbVote1}\n" +
     s"Nb of votes 2 : ${voteResult.nbVote2}\n" +
     s"Nb of votes 3 : ${voteResult.nbVote3}\n" +
     s"Nb of votes 4 : ${voteResult.nbVote4}\n"
 }
 
-@main def main(): Unit = {
-
-  val parameterFilename = "param.json"
-  val voteFilename = "vote.json"
-  val param = readFromString[Parameter](readFromFile(parameterFilename))
-  val votes: Array[Vote] = readFromString[Array[Vote]](readFromFile(voteFilename))
-  val voteResults = votes.foldLeft(Map(param.activity1 -> VoteResult(), param.activity2 -> VoteResult(), param.activity3 -> VoteResult(), param.activity4 -> VoteResult())) {
+def computeVotes(votes: Seq[Vote], paramMap: Map[String, String], activityWithBonusNumber: String): Map[String, VoteResult] = {
+  val voteResults = votes.foldLeft(paramMap.keys.map(activityNumber => activityNumber -> VoteResult()).toMap) {
     (counters, vote) =>
       val voteResult1 = counters(vote.vote1)
       val voteResult2 = counters(vote.vote2)
@@ -41,10 +48,13 @@ def prettyVoteResult(voteResult: VoteResult, activity: String, bonusActivity : S
         vote.vote3 -> voteResult3.copy(counterVote = voteResult3.counterVote + 2, nbVote3 = voteResult3.nbVote3 + 1),
         vote.vote4 -> voteResult4.copy(counterVote = voteResult4.counterVote + 1, nbVote4 = voteResult4.nbVote4 + 1))
   }
-  val activityWithBonus = voteResults(param.activityWithBonus)
-  val activityWithBonusWeighted = activityWithBonus.copy(counterVote = activityWithBonus.counterVote+1)
-  val voteResultsWeighted = voteResults + (param.activityWithBonus -> activityWithBonusWeighted)
-  val maxResult = voteResultsWeighted.reduce { (left, right) =>
+  val activityWithBonus = voteResults(activityWithBonusNumber)
+  val activityWithBonusWeighted = activityWithBonus.copy(counterVote = activityWithBonus.counterVote + 1)
+  voteResults + (activityWithBonusNumber -> activityWithBonusWeighted)
+}
+
+def computeWinner(activityWithBonusNumber: String, voteResultsWeighted: Map[String, VoteResult]): (String, VoteResult) = {
+  voteResultsWeighted.reduce { (left, right) =>
     val leftVote = left._2
     val rightVote = right._2
     (leftVote, rightVote) match {
@@ -58,11 +68,26 @@ def prettyVoteResult(voteResult: VoteResult, activity: String, bonusActivity : S
       case (leftVote, rightVote) if leftVote.counterVote == rightVote.counterVote && leftVote.nbVote3 < rightVote.nbVote3 => right
       case (leftVote, rightVote) if leftVote.counterVote == rightVote.counterVote && leftVote.nbVote4 > rightVote.nbVote4 => left
       case (leftVote, rightVote) if leftVote.counterVote == rightVote.counterVote && leftVote.nbVote4 < rightVote.nbVote4 => right
-      case (leftVote, rightVote) if left._1 == param.activityWithBonus => left
-      case (leftVote, rightVote) if right._1 == param.activityWithBonus => right
+      case (leftVote, rightVote) if left._1 == activityWithBonusNumber => left
+      case (leftVote, rightVote) if right._1 == activityWithBonusNumber => right
       case _ => left
     }
   }
+}
+@main def main(): Unit = {
+
+  val parameterFilename = "param.json"
+  val param = readFromString[Parameter](readFromFile(parameterFilename).mkString)
+  val paramMap = Map("1" -> param.activity1, "2" -> param.activity2, "3" -> param.activity3, "4" -> param.activity4)
+  val activityWithBonusNumber = paramMap.filter((activityNumber: String, activityName: String) => activityName == param.activityWithBonus).keys.head
+
+  val voteFilename = "votes.txt"
+  val rawVotes = readFromFile(voteFilename)
+  val votes: Seq[Vote] = parseVotes(rawVotes)
+  
+  val voteResultsWeighted = computeVotes(votes, paramMap, activityWithBonusNumber)
+  
+  val winner = computeWinner(activityWithBonusNumber, voteResultsWeighted)
 
   println("############################################################################")
   println("----------------------------------------------------------------------------")
@@ -79,12 +104,12 @@ def prettyVoteResult(voteResult: VoteResult, activity: String, bonusActivity : S
   println("----------------------------------------------------------------------------")
   println("|                                 RESULTS                                  |")
   println("----------------------------------------------------------------------------")
-  voteResultsWeighted.foreach((activity, voteResult) => println(prettyVoteResult(voteResult, activity, param.activityWithBonus)))
+  voteResultsWeighted.foreach((activity, voteResult) => println(prettyVoteResult(voteResult, paramMap(activity), param.activityWithBonus)))
   println("----------------------------------------------------------------------------")
   println("|                            AND THE WINNER IS                             |")
   println("----------------------------------------------------------------------------")
   println("|                                                                          |")
-  println(s"                             ${maxResult._1}                              ")
+  println(s"                             ${paramMap(winner._1)}                        ")
   println("|                                                                          |")
   println("|                                                                          |")
   println("----------------------------------------------------------------------------")
